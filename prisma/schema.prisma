@@ -1,0 +1,153 @@
+generator client {
+    provider = "prisma-client-js"
+    binaryTargets = ["native", "linux-musl-arm64-openssl-3.0.x"]
+    output = "/home/ubuntu/texaco_saas/nextjs_space/node_modules/.prisma/client"
+}
+
+datasource db {
+    provider = "postgresql"
+    url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  password      String
+  role          String    @default("admin")
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+model Station {
+  id            String    @id @default(cuid())
+  name          String
+  address       String
+  city          String
+  phone         String?
+  manager       String?
+  status        String    @default("active")
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  transactions  Transaction[]
+  promotions    Promotion[]
+
+  @@index([status])
+}
+
+model Customer {
+  id            String    @id @default(cuid())
+  firstName     String
+  lastName      String
+  email         String?   @unique
+  phone         String    @unique
+  dpi           String?   @unique
+  totalPoints   Int       @default(0)
+  lifetimePoints Int      @default(0)
+  tier          String    @default("BRONCE")
+  status        String    @default("active")
+  joinDate      DateTime  @default(now())
+  lastVisit     DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  transactions  Transaction[]
+  redemptions   Redemption[]
+
+  @@index([phone])
+  @@index([tier])
+  @@index([status])
+}
+
+model Transaction {
+  id            String    @id @default(cuid())
+  customerId    String
+  customer      Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  stationId     String
+  station       Station   @relation(fields: [stationId], references: [id], onDelete: Cascade)
+  type          String    // FUEL, STORE, BONUS
+  fuelType      String?   // REGULAR, PREMIUM, DIESEL
+  gallons       Float?    
+  amount        Float
+  pointsEarned  Int
+  multiplier    Float     @default(1.0)
+  promotionId   String?
+  description   String?
+  date          DateTime  @default(now())
+  createdAt     DateTime  @default(now())
+
+  @@index([customerId, date])
+  @@index([stationId, date])
+  @@index([date])
+}
+
+model Reward {
+  id            String    @id @default(cuid())
+  name          String
+  description   String?
+  pointsCost    Int
+  category      String    // FUEL, STORE, EXPERIENCE, MERCHANDISE
+  imageUrl      String?
+  stock         Int       @default(-1)  // -1 = unlimited
+  isActive      Boolean   @default(true)
+  validFrom     DateTime  @default(now())
+  validUntil    DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  redemptions   Redemption[]
+
+  @@index([isActive])
+  @@index([category])
+}
+
+model Redemption {
+  id            String    @id @default(cuid())
+  customerId    String
+  customer      Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  rewardId      String
+  reward        Reward    @relation(fields: [rewardId], references: [id], onDelete: Cascade)
+  pointsSpent   Int
+  status        String    @default("PENDING") // PENDING, COMPLETED, CANCELLED
+  redeemedAt    DateTime  @default(now())
+  completedAt   DateTime?
+
+  @@index([customerId])
+  @@index([status])
+}
+
+model Promotion {
+  id            String    @id @default(cuid())
+  name          String
+  description   String?
+  type          String    // MULTIPLIER, BONUS_POINTS, DOUBLE_POINTS
+  multiplier    Float     @default(1.0)
+  bonusPoints   Int       @default(0)
+  minAmount     Float?    // minimum purchase amount
+  fuelType      String?   // applies to specific fuel type
+  stationId     String?   // applies to specific station
+  station       Station?  @relation(fields: [stationId], references: [id], onDelete: SetNull)
+  isActive      Boolean   @default(true)
+  startDate     DateTime
+  endDate       DateTime
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([isActive, startDate, endDate])
+}
+
+model PointsConfig {
+  id            String    @id @default(cuid())
+  fuelType      String    @unique // REGULAR, PREMIUM, DIESEL, STORE
+  pointsPerQuetzal Float  @default(1.0)
+  description   String?
+  updatedAt     DateTime  @updatedAt
+}
+
+model TierConfig {
+  id            String    @id @default(cuid())
+  name          String    @unique // BRONCE, PLATA, ORO, PLATINO
+  minPoints     Int       @default(0)
+  multiplier    Float     @default(1.0)
+  color         String    @default("#CD7F32")
+  benefits      String?   // JSON string of benefits
+  updatedAt     DateTime  @updatedAt
+}
